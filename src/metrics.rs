@@ -18,28 +18,26 @@ impl MetricsClass {
     fn compute(&mut self, cursor: &TreeCursor, code: &[u8]) {
         self.name = cursor
             .node()
-            .child_by_field_name("name".as_bytes()).unwrap()
+            .child_by_field_name("name").unwrap()
             .utf8_text(code).unwrap().to_string();
 
         let mut class_cursor = cursor
             .node()
-            .child_by_field_name("body".as_bytes()).unwrap()
+            .child_by_field_name("body").unwrap()
             .walk();
 
         class_cursor.goto_first_child();
-        if class_cursor.node().kind() == "method_declaration" {
-            let mut met = MetricsMethod::new();
-            met.compute(&mut class_cursor, code);
-            self.metrics_method_list.push(met);
-        }
-        while class_cursor.goto_next_sibling() {
+        loop {
             if class_cursor.node().kind() == "method_declaration" {
                 let mut met = MetricsMethod::new();
                 met.compute(&mut class_cursor, code);
                 self.metrics_method_list.push(met);
             }
+            
+            if !class_cursor.goto_next_sibling() {
+                break;
+            }
         }
-
         class_cursor.goto_parent();
 
         self.compute_wmc();
@@ -108,9 +106,12 @@ impl MetricsMethod {
         }
         
         if cursor.goto_first_child() {
-            self.compute_cyclomatic(cursor, code);
-            while cursor.goto_next_sibling() {
+            loop {
                 self.compute_cyclomatic(cursor, code);
+
+                if !cursor.goto_next_sibling() {
+                    break;
+                }
             }
             cursor.goto_parent();
         }
@@ -131,9 +132,12 @@ pub fn metrics(cursor: &mut TreeCursor, code: &[u8]) -> Vec<MetricsClass> {
     
     let mut metrics_list: Vec<MetricsClass> = Vec::new();
     if cursor.goto_first_child() {
-        metrics_list.extend(metrics(cursor, code));
-        while cursor.goto_next_sibling() {
+        loop {
             metrics_list.extend(metrics(cursor, code));
+
+            if !cursor.goto_next_sibling() {
+                break;
+            }
         }
         cursor.goto_parent();
     }
