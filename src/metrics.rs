@@ -28,14 +28,14 @@ impl MetricsClass {
 
         class_cursor.goto_first_child();
         if class_cursor.node().kind() == "method_declaration" {
-            let mut met = MetricsMethod::new(method_name(&mut class_cursor, code));
-            met.compute_cyclomatic(&mut class_cursor, code);
+            let mut met = MetricsMethod::new();
+            met.compute(&mut class_cursor, code);
             self.metrics_method_list.push(met);
         }
         while class_cursor.goto_next_sibling() {
             if class_cursor.node().kind() == "method_declaration" {
-                let mut met = MetricsMethod::new(method_name(&mut class_cursor, code));
-                met.compute_cyclomatic(&mut class_cursor, code);
+                let mut met = MetricsMethod::new();
+                met.compute(&mut class_cursor, code);
                 self.metrics_method_list.push(met);
             }
         }
@@ -68,11 +68,20 @@ struct MetricsMethod {
 }
 
 impl MetricsMethod {
-    fn new(name: String) -> Self {
+    fn new() -> Self {
         Self {
-            name: name,
+            name: "".to_string(),
             cyclomatic: 1,
         }
+    }
+
+    fn compute(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
+        self.name = cursor
+            .node()
+            .child(2).unwrap()
+            .utf8_text(code).unwrap().to_string();
+        
+        self.compute_cyclomatic(cursor, code);
     }
 
     fn compute_cyclomatic(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
@@ -129,14 +138,4 @@ pub fn metrics(cursor: &mut TreeCursor, code: &[u8]) -> Vec<MetricsClass> {
         cursor.goto_parent();
     }
     metrics_list
-}
-
-fn method_name(cursor: &mut TreeCursor, code: &[u8]) -> String {
-    cursor.goto_first_child();
-    cursor.goto_next_sibling();
-    cursor.goto_next_sibling();
-    let name = cursor.node().utf8_text(code).unwrap().to_string();
-    cursor.goto_parent();
-
-    name
 }
