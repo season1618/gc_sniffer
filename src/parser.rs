@@ -5,17 +5,10 @@ extern "C" { fn tree_sitter_java() -> Language; }
 pub fn parse(code: &String) -> Result<Tree, &str> {
     let mut parser = Parser::new();
     parser.set_language(unsafe { tree_sitter_java() }).unwrap();
-
-    if let Some(tree) = parser.parse(&code.clone(), None) {
-        // dump_tree(&mut tree.walk(), 0);
-        dump_class(&mut tree.walk(), code.as_bytes(), 0);
-        return Ok(tree);
-    } else {
-        return Err("failed to parse");
-    }
+    parser.parse(&code.clone(), None).ok_or("failed to parse")
 }
 
-fn dump_tree(tree_cursor: &mut TreeCursor, indent: usize) {
+pub fn dump_tree(tree_cursor: &mut TreeCursor, indent: usize) {
     println!("{}{}", " ".repeat(indent), tree_cursor.node().kind());
 
     if tree_cursor.goto_first_child() {
@@ -27,7 +20,7 @@ fn dump_tree(tree_cursor: &mut TreeCursor, indent: usize) {
     }
 }
 
-fn dump_class(tree_cursor: &mut TreeCursor, code: &[u8], indent: usize) {
+pub fn dump_attr(tree_cursor: &mut TreeCursor, code: &[u8], indent: usize) {
     let kind = tree_cursor.node().kind();
     if kind == "class_declaration" || kind == "field_declaration" {
         tree_cursor.goto_first_child();
@@ -59,9 +52,9 @@ fn dump_class(tree_cursor: &mut TreeCursor, code: &[u8], indent: usize) {
     }
 
     if tree_cursor.goto_first_child() {
-        dump_class(tree_cursor, code, indent + 4);
+        dump_attr(tree_cursor, code, indent + 4);
         while tree_cursor.goto_next_sibling() {
-            dump_class(tree_cursor, code, indent + 4);
+            dump_attr(tree_cursor, code, indent + 4);
         }
         tree_cursor.goto_parent();
     }
