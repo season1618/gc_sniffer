@@ -16,8 +16,8 @@ fn main() {
             let mut cursor = tree.walk();
             // dump_tree(&mut cursor, 0);
             dump_attr(&mut cursor, code.as_bytes(), 0);
-            for method in metrics(&mut cursor, code.as_bytes()) {
-                method.dump_metrics();
+            for class in metrics(&mut cursor, code.as_bytes()) {
+                class.dump_metrics();
             }
         }
     } else {
