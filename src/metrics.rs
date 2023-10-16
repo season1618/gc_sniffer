@@ -2,6 +2,7 @@ use tree_sitter::{TreeCursor};
 
 pub struct MetricsClass {
     name: String,
+    wmc: usize,
     metrics_method_list: Vec<MetricsMethod>,
 }
 
@@ -9,6 +10,7 @@ impl MetricsClass {
     fn new() -> Self {
         Self {
             name: "".to_string(),
+            wmc: 0,
             metrics_method_list: Vec::new(),
         }
     }
@@ -39,10 +41,20 @@ impl MetricsClass {
         }
 
         class_cursor.goto_parent();
+
+        self.compute_wmc();
+    }
+
+    fn compute_wmc(&mut self) {
+        for metrics_method in &self.metrics_method_list {
+            self.wmc += metrics_method.cyclomatic;
+        }
     }
 
     pub fn dump_metrics(&self) {
         println!("class: {}", self.name);
+        println!("wmc  : {}", self.wmc);
+        println!("");
 
         for metrics_method in &self.metrics_method_list {
             metrics_method.dump_metrics();
