@@ -3,6 +3,7 @@ use tree_sitter::{TreeCursor};
 pub struct MetricsClass {
     name: String,
     wmc: usize,
+    field_name_list: Vec<String>,
     metrics_method_list: Vec<MetricsMethod>,
 }
 
@@ -11,11 +12,12 @@ impl MetricsClass {
         Self {
             name: "".to_string(),
             wmc: 0,
+            field_name_list: Vec::new(),
             metrics_method_list: Vec::new(),
         }
     }
 
-    fn compute(&mut self, cursor: &TreeCursor, code: &[u8]) {
+    fn compute(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
         self.name = cursor
             .node()
             .child_by_field_name("name").unwrap()
@@ -28,10 +30,26 @@ impl MetricsClass {
 
         class_cursor.goto_first_child();
         loop {
-            if class_cursor.node().kind() == "method_declaration" {
-                let mut met = MetricsMethod::new();
-                met.compute(&mut class_cursor, code);
-                self.metrics_method_list.push(met);
+            match class_cursor.node().kind() {
+                "field_declaration" => {
+                    let mut decl_node_list = class_cursor
+                        .node()
+                        .children_by_field_name("declarator", &mut class_cursor);
+
+                    for decl_node in decl_node_list {
+                        let ident = decl_node
+                            .child_by_field_name("name").unwrap()
+                            .utf8_text(code).unwrap().to_string();
+
+                        self.field_name_list.push(ident);
+                    }
+                },
+                "method_declaration" => {
+                    let mut met = MetricsMethod::new();
+                    met.compute(&mut class_cursor, code);
+                    self.metrics_method_list.push(met);
+                },
+                _ => {},
             }
             
             if !class_cursor.goto_next_sibling() {
@@ -76,7 +94,7 @@ impl MetricsMethod {
     fn compute(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
         self.name = cursor
             .node()
-            .child(2).unwrap()
+            .child_by_field_name("name").unwrap()
             .utf8_text(code).unwrap().to_string();
         
         self.compute_cyclomatic(cursor, code);
