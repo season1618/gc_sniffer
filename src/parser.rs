@@ -1,11 +1,12 @@
 use tree_sitter::{Parser, Language, Tree, TreeCursor};
+use crate::error::AnalysisError::{self, ParseError};
 
 extern "C" { fn tree_sitter_java() -> Language; }
 
-pub fn parse(code: &String) -> Result<Tree, &str> {
+pub fn parse(code: &String) -> Result<Tree, AnalysisError> {
     let mut parser = Parser::new();
     parser.set_language(unsafe { tree_sitter_java() }).unwrap();
-    parser.parse(&code.clone(), None).ok_or("failed to parse")
+    parser.parse(&code.clone(), None).ok_or(ParseError)
 }
 
 pub fn dump_tree(cursor: &mut TreeCursor, indent: usize) {
@@ -37,7 +38,7 @@ pub fn dump_attr(cursor: &mut TreeCursor, code: &[u8], indent: usize) {
                 .utf8_text(code).unwrap();
 
             let mut cursor2 = cursor.clone();
-            let mut decl_node_list = cursor
+            let decl_node_list = cursor
                 .node()
                 .children_by_field_name("declarator", &mut cursor2);
 
