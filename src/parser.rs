@@ -8,54 +8,68 @@ pub fn parse(code: &String) -> Result<Tree, &str> {
     parser.parse(&code.clone(), None).ok_or("failed to parse")
 }
 
-pub fn dump_tree(tree_cursor: &mut TreeCursor, indent: usize) {
-    println!("{}{}", " ".repeat(indent), tree_cursor.node().kind());
+pub fn dump_tree(cursor: &mut TreeCursor, indent: usize) {
+    println!("{}{}", " ".repeat(indent), cursor.node().kind());
 
-    if tree_cursor.goto_first_child() {
-        dump_tree(tree_cursor, indent + 4);
-        while tree_cursor.goto_next_sibling() {
-            dump_tree(tree_cursor, indent + 4);
+    if cursor.goto_first_child() {
+        dump_tree(cursor, indent + 4);
+        while cursor.goto_next_sibling() {
+            dump_tree(cursor, indent + 4);
         }
-        tree_cursor.goto_parent();
+        cursor.goto_parent();
     }
 }
 
-pub fn dump_attr(tree_cursor: &mut TreeCursor, code: &[u8], indent: usize) {
-    let kind = tree_cursor.node().kind();
-    if kind == "class_declaration" || kind == "field_declaration" {
-        tree_cursor.goto_first_child();
-        let type_name = tree_cursor.node().utf8_text(code).unwrap();
+pub fn dump_attr(cursor: &mut TreeCursor, code: &[u8], indent: usize) {
+    match cursor.node().kind() {
+        "class_declaration" => {
+            let name = cursor
+                .node()
+                .child_by_field_name("name").unwrap()
+                .utf8_text(code).unwrap();
+            
+            println!("{}class {}", " ".repeat(indent), name);
+        },
+        "field_declaration" => {
+            let type_name = cursor
+                .node()
+                .child_by_field_name("type").unwrap()
+                .utf8_text(code).unwrap();
 
-        tree_cursor.goto_next_sibling();
-        let mut ident = tree_cursor.node().utf8_text(code).unwrap();
+            let mut cursor2 = cursor.clone();
+            let mut decl_node_list = cursor
+                .node()
+                .children_by_field_name("declarator", &mut cursor2);
 
-        if tree_cursor.goto_first_child() {
-            ident = tree_cursor.node().utf8_text(code).unwrap();
-            tree_cursor.goto_parent();
-        }
-        println!("{}{}: {}", " ".repeat(indent), ident, type_name);
-        tree_cursor.goto_parent();
+            for decl_node in decl_node_list {
+                let name = decl_node
+                    .child_by_field_name("name").unwrap()
+                    .utf8_text(code).unwrap();
+
+                println!("{}{}: {}", " ".repeat(indent), name, type_name);
+            }
+        },
+        "method_declaration" => {
+            let type_name = cursor
+                .node()
+                .child_by_field_name("type").unwrap()
+                .utf8_text(code).unwrap();
+            
+            let name = cursor
+                .node()
+                .child_by_field_name("name").unwrap()
+                .utf8_text(code).unwrap();
+            
+            println!("{}{}(): {}", " ".repeat(indent), name, type_name);
+        },
+        _ => {},
     }
 
-    if kind == "method_declaration" {
-        tree_cursor.goto_first_child();
-        let _modifier = tree_cursor.node().utf8_text(code).unwrap();
-
-        tree_cursor.goto_next_sibling();
-        let type_name = tree_cursor.node().utf8_text(code).unwrap();
-
-        tree_cursor.goto_next_sibling();
-        let ident = tree_cursor.node().utf8_text(code).unwrap();
-
-        println!("{}{}(): {}", " ".repeat(indent), ident, type_name);
-        tree_cursor.goto_parent();
-    }
-
-    if tree_cursor.goto_first_child() {
-        dump_attr(tree_cursor, code, indent + 4);
-        while tree_cursor.goto_next_sibling() {
-            dump_attr(tree_cursor, code, indent + 4);
+    if cursor.goto_first_child() {
+        dump_attr(cursor, code, indent + 4);
+        while cursor.goto_next_sibling() {
+            dump_attr(cursor, code, indent + 4);
         }
-        tree_cursor.goto_parent();
+        cursor.goto_parent();
     }
 }
