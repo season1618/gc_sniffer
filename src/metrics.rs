@@ -33,7 +33,7 @@ impl MetricsClass {
             match class_cursor.node().kind() {
                 "field_declaration" => {
                     let mut class_cursor2 = class_cursor.clone();
-                    let mut decl_node_list = class_cursor
+                    let decl_node_list = class_cursor
                         .node()
                         .children_by_field_name("declarator", &mut class_cursor2);
 
@@ -45,7 +45,7 @@ impl MetricsClass {
                         self.field_name_list.push(ident);
                     }
                 },
-                "method_declaration" => {
+                "constructor_declaration" | "method_declaration" => {
                     let mut met = MetricsMethod::new();
                     met.compute(&mut class_cursor, code);
                     self.metrics_method_list.push(met);
@@ -69,9 +69,8 @@ impl MetricsClass {
     }
 
     pub fn dump_metrics(&self) {
-        println!("class: {}", self.name);
-        println!("wmc  : {}", self.wmc);
-        println!("");
+        println!("class {}", self.name);
+        println!("    WMC : {}", self.wmc);
 
         for metrics_method in &self.metrics_method_list {
             metrics_method.dump_metrics();
@@ -137,8 +136,9 @@ impl MetricsMethod {
     }
 
     fn dump_metrics(&self) {
-        println!("method: {}", self.name);
-        println!("cyclo:  {}", self.cyclomatic);
+        println!("");
+        println!("    {}()", self.name);
+        println!("        CYCLO: {}", self.cyclomatic);
     }
 }
 
