@@ -117,6 +117,9 @@ impl MetricsMethod {
             "throw_statement" => {
                 self.cyclomatic += 1;
             },
+            "lambda_expression" => {
+                return;
+            },
             "ternary_expression" => {
                 self.cyclomatic += 1;
             },
