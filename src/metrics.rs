@@ -32,9 +32,10 @@ impl MetricsClass {
         loop {
             match class_cursor.node().kind() {
                 "field_declaration" => {
+                    let mut class_cursor2 = class_cursor.clone();
                     let mut decl_node_list = class_cursor
                         .node()
-                        .children_by_field_name("declarator", &mut class_cursor);
+                        .children_by_field_name("declarator", &mut class_cursor2);
 
                     for decl_node in decl_node_list {
                         let ident = decl_node
