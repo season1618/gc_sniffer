@@ -2,15 +2,17 @@ use tree_sitter::{TreeCursor};
 
 pub struct MetricsClass {
     name: String,
+    is_class: bool,
     wmc: usize,
     field_name_list: Vec<String>,
     metrics_method_list: Vec<MetricsMethod>,
 }
 
 impl MetricsClass {
-    fn new() -> Self {
+    fn new(is_class: bool) -> Self {
         Self {
             name: "".to_string(),
+            is_class: is_class,
             wmc: 0,
             field_name_list: Vec::new(),
             metrics_method_list: Vec::new(),
@@ -23,19 +25,38 @@ impl MetricsClass {
             .child_by_field_name("name").unwrap()
             .utf8_text(code).unwrap().to_string();
 
-        let mut class_cursor = cursor
+        let mut body_cursor = cursor
             .node()
             .child_by_field_name("body").unwrap()
             .walk();
 
-        class_cursor.goto_first_child();
+        if self.is_class {
+            self.walk_body(&mut body_cursor, code);
+        } else {
+            body_cursor.goto_first_child();
+            loop {
+                if body_cursor.node().kind() == "enum_body_declarations" {
+                    self.walk_body(&mut body_cursor, code);
+                    break;
+                }
+                if !body_cursor.goto_next_sibling() {
+                    break;
+                }
+            }
+        }
+
+        self.compute_wmc();
+    }
+
+    fn walk_body(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
+        cursor.goto_first_child();
         loop {
-            match class_cursor.node().kind() {
+            match cursor.node().kind() {
                 "field_declaration" => {
-                    let mut class_cursor2 = class_cursor.clone();
-                    let decl_node_list = class_cursor
+                    let mut cursor2 = cursor.clone();
+                    let decl_node_list = cursor
                         .node()
-                        .children_by_field_name("declarator", &mut class_cursor2);
+                        .children_by_field_name("declarator", &mut cursor2);
 
                     for decl_node in decl_node_list {
                         let ident = decl_node
@@ -47,19 +68,17 @@ impl MetricsClass {
                 },
                 "constructor_declaration" | "method_declaration" => {
                     let mut met = MetricsMethod::new();
-                    met.compute(&mut class_cursor, code);
+                    met.compute(cursor, code);
                     self.metrics_method_list.push(met);
                 },
                 _ => {},
             }
             
-            if !class_cursor.goto_next_sibling() {
+            if !cursor.goto_next_sibling() {
                 break;
             }
         }
-        class_cursor.goto_parent();
-
-        self.compute_wmc();
+        cursor.goto_parent();
     }
 
     fn compute_wmc(&mut self) {
@@ -69,7 +88,8 @@ impl MetricsClass {
     }
 
     pub fn dump_metrics(&self) {
-        println!("class {}", self.name);
+        println!("");
+        println!("{} {}", if self.is_class { "class" } else { "enum" }, self.name);
         println!("    WMC : {}", self.wmc);
 
         for metrics_method in &self.metrics_method_list {
@@ -146,13 +166,14 @@ impl MetricsMethod {
 }
 
 pub fn metrics(cursor: &mut TreeCursor, code: &[u8]) -> Vec<MetricsClass> {
-    if cursor.node().kind() == "class_declaration" {
-        let mut met = MetricsClass::new();
+    let mut metrics_list: Vec<MetricsClass> = Vec::new();
+
+    if cursor.node().kind() == "class_declaration" || cursor.node().kind() == "enum_declaration" {
+        let mut met = MetricsClass::new(cursor.node().kind() == "class_declaration");
         met.compute(cursor, code);
-        return vec![met];
+        metrics_list.push(met);
     }
     
-    let mut metrics_list: Vec<MetricsClass> = Vec::new();
     if cursor.goto_first_child() {
         loop {
             metrics_list.extend(metrics(cursor, code));
