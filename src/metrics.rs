@@ -3,8 +3,10 @@ use tree_sitter::{TreeCursor};
 pub struct MetricsClass {
     name: String,
     is_class: bool,
+    atfd: usize,
     wmc: usize,
     field_name_list: Vec<String>,
+    method_name_list: Vec<String>,
     metrics_method_list: Vec<MetricsMethod>,
 }
 
@@ -13,8 +15,10 @@ impl MetricsClass {
         Self {
             name: "".to_string(),
             is_class: is_class,
+            atfd: 0,
             wmc: 0,
             field_name_list: Vec::new(),
+            method_name_list: Vec::new(),
             metrics_method_list: Vec::new(),
         }
     }
@@ -45,6 +49,7 @@ impl MetricsClass {
             }
         }
 
+        self.compute_atfd(cursor, code);
         self.compute_wmc();
     }
 
@@ -59,17 +64,24 @@ impl MetricsClass {
                         .children_by_field_name("declarator", &mut cursor2);
 
                     for decl_node in decl_node_list {
-                        let ident = decl_node
+                        let name = decl_node
                             .child_by_field_name("name").unwrap()
                             .utf8_text(code).unwrap().to_string();
 
-                        self.field_name_list.push(ident);
+                        self.field_name_list.push(name);
                     }
                 },
                 "constructor_declaration" | "method_declaration" => {
                     let mut met = MetricsMethod::new();
                     met.compute(cursor, code);
                     self.metrics_method_list.push(met);
+
+                    let name = cursor
+                        .node()
+                        .child_by_field_name("name").unwrap()
+                        .utf8_text(code).unwrap().to_string();
+
+                    self.method_name_list.push(name);
                 },
                 _ => {},
             }
@@ -81,6 +93,56 @@ impl MetricsClass {
         cursor.goto_parent();
     }
 
+    fn compute_atfd(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
+        match cursor.node().kind() {
+            "field_access" => {
+                let object_name = cursor
+                    .node()
+                    .child_by_field_name("object").unwrap()
+                    .kind();
+
+                let field_name = cursor
+                    .node()
+                    .child_by_field_name("field").unwrap()
+                    .utf8_text(code).unwrap();
+
+                if object_name != "this" && object_name != "super" && field_name != &field_name.to_uppercase() && !self.field_name_list.contains(&field_name.to_string()) {
+                    self.atfd += 1;
+                }
+            },
+            "method_invocation" => {
+                if let Some(object_node) = cursor.node().child_by_field_name("object") {
+                    let object_name = object_node.kind();
+
+                    let method_name = cursor
+                        .node()
+                        .child_by_field_name("name").unwrap()
+                        .utf8_text(code).unwrap();
+
+                    let method_args = cursor
+                        .node()
+                        .child_by_field_name("arguments").unwrap()
+                        .utf8_text(code).unwrap();
+
+                    let is_getter = (method_name.starts_with("get") || method_name.starts_with("is")) && method_args.len() == 2;
+                    let is_setter = method_name.starts_with("set") && method_args.len() > 2;
+                    if object_name != "this" && (is_getter || is_setter) {
+                        self.atfd += 1;
+                    }
+                }
+            },
+            _ => {},
+        }
+
+        if cursor.goto_first_child() {
+            self.compute_atfd(cursor, code);
+            while cursor.goto_next_sibling() {
+                self.compute_atfd(cursor, code);
+            }
+            cursor.goto_parent();
+        }
+    }
+
     fn compute_wmc(&mut self) {
         for metrics_method in &self.metrics_method_list {
             self.wmc += metrics_method.cyclomatic;
@@ -90,11 +152,12 @@ impl MetricsClass {
     pub fn dump_metrics(&self) {
         println!("");
         println!("{} {}", if self.is_class { "class" } else { "enum" }, self.name);
+        println!("    ATFD: {}", self.atfd);
         println!("    WMC : {}", self.wmc);
 
-        for metrics_method in &self.metrics_method_list {
-            metrics_method.dump_metrics();
-        }
+        // for metrics_method in &self.metrics_method_list {
+        //     metrics_method.dump_metrics();
+        // }
     }
 }
 

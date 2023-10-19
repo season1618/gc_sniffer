@@ -20,7 +20,6 @@ fn main() {
 }
 
 fn analyze_dirs(path: &path::Path) -> Result<(), AnalysisError> {
-    
     if path.is_dir() {
         for entry in fs::read_dir(path)? {
             let entry = entry?;
