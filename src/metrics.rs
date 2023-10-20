@@ -1,7 +1,42 @@
 use std::collections::BTreeSet;
 use tree_sitter::{TreeCursor};
 
-pub struct MetricsClass {
+pub struct Metrics {
+    metrics_class_list: Vec<MetricsClass>,
+}
+
+impl Metrics {
+    fn new() -> Self {
+        Self {
+            metrics_class_list: Vec::new(),
+        }
+    }
+
+    fn compute(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
+        if cursor.node().kind() == "class_declaration" || cursor.node().kind() == "enum_declaration" {
+            let mut metrics = MetricsClass::new(cursor.node().kind() == "class_declaration");
+            metrics.compute(cursor, code);
+            self.metrics_class_list.push(metrics);
+        }
+        
+        if cursor.goto_first_child() {
+            self.compute(cursor, code);
+            while cursor.goto_next_sibling() {
+                self.compute(cursor, code);
+            }
+            cursor.goto_parent();
+        }
+    }
+
+    fn dump_metrics(&self) {
+        println!("Metrics");
+        for class in &self.metrics_class_list {
+            class.dump_metrics();
+        }
+    }
+}
+
+struct MetricsClass {
     name: String,
     is_class: bool,
     atfd: usize,
@@ -79,9 +114,9 @@ impl MetricsClass {
                     cursor.goto_parent();
                 },
                 "constructor_declaration" | "method_declaration" => {
-                    let mut met = MetricsMethod::new();
-                    met.compute(cursor, code);
-                    self.metrics_method_list.push(met);
+                    let mut metrics = MetricsMethod::new();
+                    metrics.compute(cursor, code);
+                    self.metrics_method_list.push(metrics);
 
                     let name = cursor
                         .node()
@@ -183,7 +218,7 @@ impl MetricsClass {
         self.tcc /= (n * (n - 1) / 2) as f32;
     }
 
-    pub fn dump_metrics(&self) {
+    fn dump_metrics(&self) {
         println!("");
         println!("{} {}", if self.is_class { "class" } else { "enum" }, self.name);
         println!("    ATFD: {}", self.atfd);
@@ -295,24 +330,8 @@ impl MetricsMethod {
     }
 }
 
-pub fn metrics(cursor: &mut TreeCursor, code: &[u8]) -> Vec<MetricsClass> {
-    let mut metrics_list: Vec<MetricsClass> = Vec::new();
-
-    if cursor.node().kind() == "class_declaration" || cursor.node().kind() == "enum_declaration" {
-        let mut met = MetricsClass::new(cursor.node().kind() == "class_declaration");
-        met.compute(cursor, code);
-        metrics_list.push(met);
-    }
-    
-    if cursor.goto_first_child() {
-        loop {
-            metrics_list.extend(metrics(cursor, code));
-
-            if !cursor.goto_next_sibling() {
-                break;
-            }
-        }
-        cursor.goto_parent();
-    }
-    metrics_list
+pub fn dump_metrics(cursor: &mut TreeCursor, code: &[u8]) {
+    let mut metrics = Metrics::new();
+    metrics.compute(cursor, code);
+    metrics.dump_metrics();
 }
