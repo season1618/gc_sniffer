@@ -1,3 +1,4 @@
+use std::collections::BTreeSet;
 use tree_sitter::{TreeCursor};
 
 pub struct MetricsClass {
@@ -5,6 +6,7 @@ pub struct MetricsClass {
     is_class: bool,
     atfd: usize,
     wmc: usize,
+    tcc: f32,
     field_name_list: Vec<String>,
     method_name_list: Vec<String>,
     metrics_method_list: Vec<MetricsMethod>,
@@ -17,6 +19,7 @@ impl MetricsClass {
             is_class: is_class,
             atfd: 0,
             wmc: 0,
+            tcc: 0.0,
             field_name_list: Vec::new(),
             method_name_list: Vec::new(),
             metrics_method_list: Vec::new(),
@@ -51,6 +54,7 @@ impl MetricsClass {
 
         self.compute_atfd(cursor, code);
         self.compute_wmc();
+        self.compute_tcc();
     }
 
     fn walk_body(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
@@ -149,11 +153,39 @@ impl MetricsClass {
         }
     }
 
+    fn compute_tcc(&mut self) {
+        let n = self.metrics_method_list.len();
+        if n <= 1 {
+            return;
+        }
+
+        for i in 0..n {
+            let usage1: &BTreeSet<&String> = &self.metrics_method_list[i].usage_field_list
+                .iter()
+                .filter(|x| self.field_name_list.contains(x))
+                .collect();
+
+            for j in 0..i {
+                let usage2: &BTreeSet<&String> = &self.metrics_method_list[j].usage_field_list
+                    .iter()
+                    .filter(|x| self.field_name_list.contains(x))
+                    .collect();
+
+                if !usage1.is_disjoint(usage2) {
+                    self.tcc += 1.0;
+                }
+            }
+        }
+
+        self.tcc /= (n * (n - 1) / 2) as f32;
+    }
+
     pub fn dump_metrics(&self) {
         println!("");
         println!("{} {}", if self.is_class { "class" } else { "enum" }, self.name);
         println!("    ATFD: {}", self.atfd);
         println!("    WMC : {}", self.wmc);
+        println!("    TCC : {:.3}%", self.tcc * 100.0);
 
         // for metrics_method in &self.metrics_method_list {
         //     metrics_method.dump_metrics();
@@ -164,6 +196,7 @@ impl MetricsClass {
 struct MetricsMethod {
     name: String,
     cyclomatic: usize,
+    usage_field_list: BTreeSet<String>,
 }
 
 impl MetricsMethod {
@@ -171,6 +204,7 @@ impl MetricsMethod {
         Self {
             name: "".to_string(),
             cyclomatic: 1,
+            usage_field_list: BTreeSet::new(),
         }
     }
 
@@ -181,6 +215,7 @@ impl MetricsMethod {
             .utf8_text(code).unwrap().to_string();
         
         self.compute_cyclomatic(cursor, code);
+        self.compute_usage_field(cursor, code);
     }
 
     fn compute_cyclomatic(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
@@ -216,6 +251,35 @@ impl MetricsMethod {
                 if !cursor.goto_next_sibling() {
                     break;
                 }
+            }
+            cursor.goto_parent();
+        }
+    }
+
+    fn compute_usage_field(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
+        match cursor.node().kind() {
+            "identifier" => {
+                let ident = cursor
+                    .node()
+                    .utf8_text(code).unwrap().to_string();
+
+                self.usage_field_list.insert(ident);
+            },
+            "field_access" => {
+                let field_name = cursor
+                    .node()
+                    .child_by_field_name("field").unwrap()
+                    .utf8_text(code).unwrap().to_string();
+
+                self.usage_field_list.insert(field_name);
+            },
+            _ => {},
+        }
+
+        if cursor.goto_first_child() {
+            self.compute_usage_field(cursor, code);
+            while cursor.goto_next_sibling() {
+                self.compute_usage_field(cursor, code);
             }
             cursor.goto_parent();
         }
