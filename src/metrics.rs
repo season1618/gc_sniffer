@@ -34,6 +34,15 @@ impl Metrics {
             class.dump_metrics();
         }
     }
+
+    fn dump_god_class(&self) {
+        println!("God Class");
+        for class in &self.metrics_class_list {
+            if class.is_god {
+                class.dump_metrics();
+            }
+        }
+    }
 }
 
 struct MetricsClass {
@@ -42,6 +51,7 @@ struct MetricsClass {
     atfd: usize,
     wmc: usize,
     tcc: f32,
+    is_god: bool,
     field_name_list: Vec<String>,
     method_name_list: Vec<String>,
     metrics_method_list: Vec<MetricsMethod>,
@@ -55,6 +65,7 @@ impl MetricsClass {
             atfd: 0,
             wmc: 0,
             tcc: 0.0,
+            is_god: false,
             field_name_list: Vec::new(),
             method_name_list: Vec::new(),
             metrics_method_list: Vec::new(),
@@ -90,6 +101,7 @@ impl MetricsClass {
         self.compute_atfd(cursor, code);
         self.compute_wmc();
         self.compute_tcc();
+        self.compute_is_god(5, 47, 1.0 / 3.0);
     }
 
     fn walk_body(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
@@ -218,16 +230,16 @@ impl MetricsClass {
         self.tcc /= (n * (n - 1) / 2) as f32;
     }
 
+    fn compute_is_god(&mut self, atfd_min: usize, wmc_min: usize, tcc_max: f32) {
+        self.is_god = self.atfd > atfd_min && self.wmc >= wmc_min && self.tcc < tcc_max;
+    }
+
     fn dump_metrics(&self) {
         println!("");
         println!("{} {}", if self.is_class { "class" } else { "enum" }, self.name);
         println!("    ATFD: {}", self.atfd);
         println!("    WMC : {}", self.wmc);
         println!("    TCC : {:.3}%", self.tcc * 100.0);
-
-        // for metrics_method in &self.metrics_method_list {
-        //     metrics_method.dump_metrics();
-        // }
     }
 }
 
@@ -333,5 +345,5 @@ impl MetricsMethod {
 pub fn dump_metrics(cursor: &mut TreeCursor, code: &[u8]) {
     let mut metrics = Metrics::new();
     metrics.compute(cursor, code);
-    metrics.dump_metrics();
+    metrics.dump_god_class();
 }
