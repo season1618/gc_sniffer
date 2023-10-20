@@ -62,18 +62,21 @@ impl MetricsClass {
         loop {
             match cursor.node().kind() {
                 "field_declaration" => {
-                    let mut cursor2 = cursor.clone();
-                    let decl_node_list = cursor
-                        .node()
-                        .children_by_field_name("declarator", &mut cursor2);
+                    cursor.goto_first_child();
+                    loop {
+                        if cursor.field_name() == Some("declarator") {
+                            let name = cursor
+                                .node()
+                                .child_by_field_name("name").unwrap()
+                                .utf8_text(code).unwrap().to_string();
 
-                    for decl_node in decl_node_list {
-                        let name = decl_node
-                            .child_by_field_name("name").unwrap()
-                            .utf8_text(code).unwrap().to_string();
-
-                        self.field_name_list.push(name);
+                            self.field_name_list.push(name);
+                        }
+                        if !cursor.goto_next_sibling() {
+                            break;
+                        }
                     }
+                    cursor.goto_parent();
                 },
                 "constructor_declaration" | "method_declaration" => {
                     let mut met = MetricsMethod::new();

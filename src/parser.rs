@@ -37,18 +37,21 @@ pub fn dump_attr(cursor: &mut TreeCursor, code: &[u8], indent: usize) {
                 .child_by_field_name("type").unwrap()
                 .utf8_text(code).unwrap();
 
-            let mut cursor2 = cursor.clone();
-            let decl_node_list = cursor
-                .node()
-                .children_by_field_name("declarator", &mut cursor2);
+            cursor.goto_first_child();
+            loop {
+                if cursor.field_name() == Some("declarator") {
+                    let name = cursor
+                        .node()
+                        .child_by_field_name("name").unwrap()
+                        .utf8_text(code).unwrap().to_string();
 
-            for decl_node in decl_node_list {
-                let name = decl_node
-                    .child_by_field_name("name").unwrap()
-                    .utf8_text(code).unwrap();
-
-                println!("{}{}: {}", " ".repeat(indent), name, type_name);
+                    println!("{}{}: {}", " ".repeat(indent), name, type_name);
+                }
+                if !cursor.goto_next_sibling() {
+                    break;
+                }
             }
+            cursor.goto_parent();
         },
         "method_declaration" => {
             let type_name = cursor
