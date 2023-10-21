@@ -270,40 +270,59 @@ impl MetricsMethod {
 
     fn compute_cyclomatic(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
         match cursor.node().kind() {
-            "if_statement" | "while_statement" | "do_statement" | "for_statement" | "enhanced_for_statement" => {
+            "if_statement" | "while_statement" | "do_statement" | "for_statement" | "ternary_expression" => {
                 self.cyclomatic += 1;
+                let mut cond_cursor = cursor
+                    .node()
+                    .child_by_field_name("condition").unwrap()
+                    .walk();
+                
+                self.compute_condition_complexity(&mut cond_cursor);
+            },
+            "enhanced_for_statement" => {
+                self.cyclomatic += 1;
+            },
+            "switch_expression" => { // switch statement or expression
+                let mut cond_cursor = cursor
+                    .node()
+                    .child_by_field_name("condition").unwrap()
+                    .walk();
+                
+                self.compute_condition_complexity(&mut cond_cursor);
             },
             "switch_label" if cursor.node().utf8_text(code).unwrap() != "default" => { // switch statement or expression
                 self.cyclomatic += 1;
             },
-            "catch_clause" => {
+            "catch_clause" | "throw_statement" => {
                 self.cyclomatic += 1;
-            },
-            "assert_statement" => {
+            }
+            "lambda_expression" | "assert_statement" => {
                 return;
-            },
-            "throw_statement" => {
-                self.cyclomatic += 1;
-            },
-            "lambda_expression" => {
-                return;
-            },
-            "ternary_expression" => {
-                self.cyclomatic += 1;
-            },
-            "&&" | "||" => {
-                self.cyclomatic += 1;
             },
             _ => {},
         }
         
         if cursor.goto_first_child() {
-            loop {
+            self.compute_cyclomatic(cursor, code);
+            while cursor.goto_next_sibling() {
                 self.compute_cyclomatic(cursor, code);
+            }
+            cursor.goto_parent();
+        }
+    }
 
-                if !cursor.goto_next_sibling() {
-                    break;
-                }
+    fn compute_condition_complexity(&mut self, cursor: &mut TreeCursor) {
+        match cursor.node().kind() {
+            "&&" | "||" => {
+                self.cyclomatic += 1;
+            },
+            _ => {},
+        }
+
+        if cursor.goto_first_child() {
+            self.compute_condition_complexity(cursor);
+            while cursor.goto_next_sibling() {
+                self.compute_condition_complexity(cursor);
             }
             cursor.goto_parent();
         }
