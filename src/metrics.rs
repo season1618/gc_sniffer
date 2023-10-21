@@ -279,8 +279,8 @@ impl MetricsMethod {
             "catch_clause" => {
                 self.cyclomatic += 1;
             },
-            "assert_statement" => { // if (condition) { throw ... }
-                self.cyclomatic += 2;
+            "assert_statement" => {
+                return;
             },
             "throw_statement" => {
                 self.cyclomatic += 1;
