@@ -291,6 +291,9 @@ impl MetricsMethod {
             "ternary_expression" => {
                 self.cyclomatic += 1;
             },
+            "&&" | "||" => {
+                self.cyclomatic += 1;
+            },
             _ => {},
         }
         
