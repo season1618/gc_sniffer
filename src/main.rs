@@ -7,7 +7,7 @@ use std::fs;
 use std::path;
 
 use crate::error::AnalysisError;
-use crate::parser::{parse, dump_tree, dump_attr};
+use crate::parser::{parse};
 use crate::metrics::{dump_metrics};
 
 fn main() {
@@ -29,9 +29,8 @@ fn analyze_dirs(path: &path::Path) -> Result<(), AnalysisError> {
         if ext.to_str() == Some("java") {
             let code = fs::read_to_string(path)?;
             let tree = parse(&code)?;
-            let mut cursor = tree.walk();
-            dump_attr(&mut cursor, code.as_bytes(), 0);
-            dump_metrics(&mut cursor, code.as_bytes());
+            let root = tree.root_node();
+            dump_metrics(&root, code.as_bytes());
         }
     }
     Ok::<(), AnalysisError>(())

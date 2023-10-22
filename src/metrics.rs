@@ -1,5 +1,5 @@
 use std::collections::BTreeSet;
-use tree_sitter::{TreeCursor};
+use tree_sitter::{Node, TreeCursor};
 
 pub struct Metrics {
     metrics_class_list: Vec<MetricsClass>,
@@ -45,7 +45,7 @@ impl Metrics {
     }
 }
 
-struct MetricsClass {
+struct MetricsClass { // class or enum
     name: String,
     is_class: bool,
     atfd: usize,
@@ -53,8 +53,8 @@ struct MetricsClass {
     tcc: f32,
     is_god: bool,
     field_name_list: Vec<String>,
-    method_name_list: Vec<String>,
-    metrics_method_list: Vec<MetricsMethod>,
+    method_name_list: Vec<String>, // method or constructor
+    metrics_method_list: Vec<MetricsMethod>, // method or constructor
 }
 
 impl MetricsClass {
@@ -73,13 +73,12 @@ impl MetricsClass {
     }
 
     fn compute(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
-        self.name = cursor
-            .node()
+        let node = cursor.node();
+        self.name = node
             .child_by_field_name("name").unwrap()
             .utf8_text(code).unwrap().to_string();
 
-        let mut body_cursor = cursor
-            .node()
+        let mut body_cursor = node
             .child_by_field_name("body").unwrap()
             .walk();
 
@@ -98,7 +97,7 @@ impl MetricsClass {
             }
         }
 
-        self.compute_atfd(cursor, code);
+        self.compute_atfd(&mut node.walk(), code);
         self.compute_wmc();
         self.compute_tcc();
         self.compute_is_god(5, 47, 1.0 / 3.0);
@@ -127,7 +126,7 @@ impl MetricsClass {
                 },
                 "constructor_declaration" | "method_declaration" => {
                     let mut metrics = MetricsMethod::new();
-                    metrics.compute(cursor, code);
+                    metrics.compute(&cursor.node(), code);
                     self.metrics_method_list.push(metrics);
 
                     let name = cursor
@@ -218,7 +217,7 @@ impl MetricsClass {
 
             for j in 0..i {
                 if self.metrics_method_list[j].name == self.name { continue; }
-                
+
                 let usage2: &BTreeSet<&String> = &self.metrics_method_list[j].usage_field_list
                     .iter()
                     .filter(|x| self.field_name_list.contains(x))
@@ -248,7 +247,7 @@ impl MetricsClass {
     }
 }
 
-struct MetricsMethod {
+struct MetricsMethod { // method or constructor
     name: String,
     cyclomatic: usize,
     usage_field_list: BTreeSet<String>,
@@ -263,14 +262,13 @@ impl MetricsMethod {
         }
     }
 
-    fn compute(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
-        self.name = cursor
-            .node()
+    fn compute(&mut self, node: &Node, code: &[u8]) {
+        self.name = node
             .child_by_field_name("name").unwrap()
             .utf8_text(code).unwrap().to_string();
         
-        self.compute_cyclomatic(cursor, code);
-        self.compute_usage_field(cursor, code);
+        self.compute_cyclomatic(&mut node.walk(), code);
+        self.compute_usage_field(&mut node.walk(), code);
     }
 
     fn compute_cyclomatic(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
@@ -369,8 +367,8 @@ impl MetricsMethod {
     }
 }
 
-pub fn dump_metrics(cursor: &mut TreeCursor, code: &[u8]) {
+pub fn dump_metrics(node: &Node, code: &[u8]) {
     let mut metrics = Metrics::new();
-    metrics.compute(cursor, code);
+    metrics.compute(&mut node.walk(), code);
     metrics.dump_god_class();
 }
