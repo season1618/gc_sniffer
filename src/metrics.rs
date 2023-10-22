@@ -36,7 +36,7 @@ impl Metrics {
     }
 
     fn dump_god_class(&self) {
-        println!("God Class");
+        // println!("God Class");
         for class in &self.metrics_class_list {
             if class.is_god {
                 class.dump_metrics();
@@ -205,17 +205,20 @@ impl MetricsClass {
 
     fn compute_tcc(&mut self) {
         let n = self.metrics_method_list.len();
-        if n <= 1 {
-            return;
-        }
+        let mut num_method = 0;
 
         for i in 0..n {
+            if self.metrics_method_list[i].name == self.name { continue; }
+            num_method += 1;
+
             let usage1: &BTreeSet<&String> = &self.metrics_method_list[i].usage_field_list
                 .iter()
                 .filter(|x| self.field_name_list.contains(x))
                 .collect();
 
             for j in 0..i {
+                if self.metrics_method_list[j].name == self.name { continue; }
+                
                 let usage2: &BTreeSet<&String> = &self.metrics_method_list[j].usage_field_list
                     .iter()
                     .filter(|x| self.field_name_list.contains(x))
@@ -227,7 +230,9 @@ impl MetricsClass {
             }
         }
 
-        self.tcc /= (n * (n - 1) / 2) as f32;
+        if num_method > 1 {
+            self.tcc /= (num_method * (num_method - 1) / 2) as f32;
+        }
     }
 
     fn compute_is_god(&mut self, atfd_min: usize, wmc_min: usize, tcc_max: f32) {
