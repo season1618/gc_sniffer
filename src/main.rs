@@ -8,7 +8,7 @@ use std::path;
 
 use crate::error::AnalysisError;
 use crate::parser::{parse};
-use crate::metrics::{dump_metrics};
+use crate::metrics::{dump_god_class};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -30,7 +30,7 @@ fn analyze_dirs(path: &path::Path) -> Result<(), AnalysisError> {
             let code = fs::read_to_string(path)?;
             let tree = parse(&code)?;
             let root = tree.root_node();
-            dump_metrics(&root, code.as_bytes());
+            dump_god_class(&root, code.as_bytes());
         }
     }
     Ok::<(), AnalysisError>(())

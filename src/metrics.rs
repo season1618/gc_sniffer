@@ -13,34 +13,24 @@ impl Metrics {
     }
 
     fn compute(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
-        if cursor.node().kind() == "class_declaration" || cursor.node().kind() == "enum_declaration" {
-            let mut metrics = MetricsClass::new(cursor.node().kind() == "class_declaration");
-            metrics.compute(cursor, code);
-            self.metrics_class_list.push(metrics);
-        }
-        
-        if cursor.goto_first_child() {
-            self.compute(cursor, code);
-            while cursor.goto_next_sibling() {
-                self.compute(cursor, code);
+        cursor.goto_first_child();
+        loop {
+            if cursor.node().kind() == "class_declaration" || cursor.node().kind() == "enum_declaration" {
+                let mut metrics = MetricsClass::new(cursor.node().kind() == "class_declaration");
+                metrics.compute(&cursor.node(), code);
+                self.metrics_class_list.push(metrics);
             }
-            cursor.goto_parent();
-        }
-    }
 
-    fn dump_metrics(&self) {
-        println!("Metrics");
-        for class in &self.metrics_class_list {
-            class.dump_metrics();
+            if !cursor.goto_next_sibling() {
+                break;
+            }
         }
+        cursor.goto_parent();
     }
 
     fn dump_god_class(&self) {
-        // println!("God Class");
         for class in &self.metrics_class_list {
-            if class.is_god {
-                class.dump_metrics();
-            }
+            class.dump_god_class();
         }
     }
 }
@@ -53,7 +43,7 @@ struct MetricsClass { // class or enum
     tcc: f32,
     is_god: bool,
     field_name_list: Vec<String>,
-    method_name_list: Vec<String>, // method or constructor
+    metrics_class_list: Vec<MetricsClass>, // class or enum
     metrics_method_list: Vec<MetricsMethod>, // method or constructor
 }
 
@@ -67,13 +57,12 @@ impl MetricsClass {
             tcc: 0.0,
             is_god: false,
             field_name_list: Vec::new(),
-            method_name_list: Vec::new(),
+            metrics_class_list: Vec::new(),
             metrics_method_list: Vec::new(),
         }
     }
 
-    fn compute(&mut self, cursor: &mut TreeCursor, code: &[u8]) {
-        let node = cursor.node();
+    fn compute(&mut self, node: &Node, code: &[u8]) {
         self.name = node
             .child_by_field_name("name").unwrap()
             .utf8_text(code).unwrap().to_string();
@@ -107,6 +96,16 @@ impl MetricsClass {
         cursor.goto_first_child();
         loop {
             match cursor.node().kind() {
+                "class_declaration" | "enum_declaration" => {
+                    let mut metrics = MetricsClass::new(cursor.node().kind() == "class_declaration");
+                    metrics.compute(&cursor.node(), code);
+                    self.metrics_class_list.push(metrics);
+                },
+                "constructor_declaration" | "method_declaration" => {
+                    let mut metrics = MetricsMethod::new();
+                    metrics.compute(&cursor.node(), code);
+                    self.metrics_method_list.push(metrics);
+                },
                 "field_declaration" => {
                     cursor.goto_first_child();
                     loop {
@@ -123,18 +122,6 @@ impl MetricsClass {
                         }
                     }
                     cursor.goto_parent();
-                },
-                "constructor_declaration" | "method_declaration" => {
-                    let mut metrics = MetricsMethod::new();
-                    metrics.compute(&cursor.node(), code);
-                    self.metrics_method_list.push(metrics);
-
-                    let name = cursor
-                        .node()
-                        .child_by_field_name("name").unwrap()
-                        .utf8_text(code).unwrap().to_string();
-
-                    self.method_name_list.push(name);
                 },
                 _ => {},
             }
@@ -238,12 +225,18 @@ impl MetricsClass {
         self.is_god = self.atfd > atfd_min && self.wmc >= wmc_min && self.tcc < tcc_max;
     }
 
-    fn dump_metrics(&self) {
-        println!("");
-        println!("{} {}", if self.is_class { "class" } else { "enum" }, self.name);
-        println!("    ATFD: {}", self.atfd);
-        println!("    WMC : {}", self.wmc);
-        println!("    TCC : {:.3}%", self.tcc * 100.0);
+    fn dump_god_class(&self) {
+        if self.is_god {
+            println!("");
+            println!("{} {}", if self.is_class { "class" } else { "enum" }, self.name);
+            println!("    ATFD: {}", self.atfd);
+            println!("    WMC : {}", self.wmc);
+            println!("    TCC : {:.3}%", self.tcc * 100.0);
+        }
+
+        for class in &self.metrics_class_list {
+            class.dump_god_class();
+        }
     }
 }
 
@@ -367,7 +360,7 @@ impl MetricsMethod {
     }
 }
 
-pub fn dump_metrics(node: &Node, code: &[u8]) {
+pub fn dump_god_class(node: &Node, code: &[u8]) {
     let mut metrics = Metrics::new();
     metrics.compute(&mut node.walk(), code);
     metrics.dump_god_class();
