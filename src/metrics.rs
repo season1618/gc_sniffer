@@ -146,7 +146,8 @@ impl MetricsClass {
                     .child_by_field_name("field").unwrap()
                     .utf8_text(code).unwrap();
 
-                if object_name != "this" && object_name != "super" && field_name != &field_name.to_uppercase() && !self.field_name_list.contains(&field_name.to_string()) {
+                let is_static = field_name.as_bytes()[0].is_ascii_uppercase();
+                if object_name != "this" && object_name != "super" && !is_static && !self.field_name_list.contains(&field_name.to_string()) {
                     self.atfd += 1;
                 }
             },
