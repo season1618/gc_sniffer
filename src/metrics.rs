@@ -28,9 +28,9 @@ impl Metrics {
         cursor.goto_parent();
     }
 
-    fn dump_god_class(&self) {
+    fn dump_god_class(&self, path: &str) {
         for class in &self.metrics_class_list {
-            class.dump_god_class();
+            class.dump_god_class(path);
         }
     }
 }
@@ -45,6 +45,7 @@ struct MetricsClass { // class or enum
     field_name_list: Vec<String>,
     metrics_class_list: Vec<MetricsClass>, // class or enum
     metrics_method_list: Vec<MetricsMethod>, // method or constructor
+    line: usize,
 }
 
 impl MetricsClass {
@@ -59,6 +60,7 @@ impl MetricsClass {
             field_name_list: Vec::new(),
             metrics_class_list: Vec::new(),
             metrics_method_list: Vec::new(),
+            line: 0,
         }
     }
 
@@ -66,6 +68,8 @@ impl MetricsClass {
         self.name = node
             .child_by_field_name("name").unwrap()
             .utf8_text(code).unwrap().to_string();
+        
+        self.line = node.child_by_field_name("name").unwrap().start_position().row + 1;
 
         let mut body_cursor = node
             .child_by_field_name("body").unwrap()
@@ -226,17 +230,18 @@ impl MetricsClass {
         self.is_god = self.atfd > atfd_min && self.wmc >= wmc_min && self.tcc < tcc_max;
     }
 
-    fn dump_god_class(&self) {
+    fn dump_god_class(&self, path: &str) {
         if self.is_god {
-            println!("");
-            println!("{} {}", if self.is_class { "class" } else { "enum" }, self.name);
-            println!("    ATFD: {}", self.atfd);
-            println!("    WMC : {}", self.wmc);
-            println!("    TCC : {:.3}%", self.tcc * 100.0);
+            println!("{}:{}:", path, self.line);
+            // println!("");
+            // println!("{} {}", if self.is_class { "class" } else { "enum" }, self.name);
+            // println!("    ATFD: {}", self.atfd);
+            // println!("    WMC : {}", self.wmc);
+            // println!("    TCC : {:.3}%", self.tcc * 100.0);
         }
 
         for class in &self.metrics_class_list {
-            class.dump_god_class();
+            class.dump_god_class(path);
         }
     }
 }
@@ -361,8 +366,8 @@ impl MetricsMethod {
     }
 }
 
-pub fn dump_god_class(node: &Node, code: &[u8]) {
+pub fn dump_god_class(node: &Node, code: &[u8], path: &str) {
     let mut metrics = Metrics::new();
     metrics.compute(&mut node.walk(), code);
-    metrics.dump_god_class();
+    metrics.dump_god_class(path);
 }

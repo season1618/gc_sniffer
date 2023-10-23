@@ -30,7 +30,7 @@ fn analyze_dirs(path: &path::Path) -> Result<(), AnalysisError> {
             let code = fs::read_to_string(path)?;
             let tree = parse(&code)?;
             let root = tree.root_node();
-            dump_god_class(&root, code.as_bytes());
+            dump_god_class(&root, code.as_bytes(), path.to_str().unwrap());
         }
     }
     Ok::<(), AnalysisError>(())
