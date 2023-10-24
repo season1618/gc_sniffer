@@ -297,8 +297,11 @@ impl MetricsMethod {
             },
             "catch_clause" | "throw_statement" => {
                 self.cyclomatic += 1;
-            }
+            },
             "lambda_expression" | "assert_statement" => {
+                return;
+            },
+            "class_body" => {
                 return;
             },
             _ => {},
