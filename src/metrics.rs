@@ -143,14 +143,14 @@ impl MetricsClass {
                 let object_name = cursor
                     .node()
                     .child_by_field_name("object").unwrap()
-                    .kind();
+                    .utf8_text(code).unwrap();
 
                 let field_name = cursor
                     .node()
                     .child_by_field_name("field").unwrap()
                     .utf8_text(code).unwrap();
 
-                let is_static = field_name.as_bytes()[0].is_ascii_uppercase();
+                let is_static = object_name.as_bytes()[0].is_ascii_uppercase();
                 if object_name != "this" && object_name != "super" && !is_static && !self.field_name_list.contains(&field_name.to_string()) {
                     self.atfd += 1;
                 }
