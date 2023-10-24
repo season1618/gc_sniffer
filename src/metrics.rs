@@ -274,12 +274,9 @@ impl MetricsMethod {
         match cursor.node().kind() {
             "if_statement" | "while_statement" | "do_statement" | "for_statement" | "ternary_expression" => {
                 self.cyclomatic += 1;
-                let mut cond_cursor = cursor
-                    .node()
-                    .child_by_field_name("condition").unwrap()
-                    .walk();
-                
-                self.compute_condition_complexity(&mut cond_cursor);
+                if let Some(cond_node) = cursor.node().child_by_field_name("condition") {
+                    self.compute_condition_complexity(&mut cond_node.walk());
+                }
             },
             "enhanced_for_statement" => {
                 self.cyclomatic += 1;
